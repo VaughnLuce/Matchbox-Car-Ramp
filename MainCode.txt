@@ -1,0 +1,283 @@
+#pragma config WDTE = OFF //WDTE Operating Mode
+
+#include <xc.h>
+#include <stdio.h>
+#include <stdint.h>
+#include <math.h>
+
+#define _XTAL_FREQ 4000000
+
+#include "GPIO_Init.h"
+#include "TMR0_Init.h"
+#include "PWM_Init.h"
+#include "TMR1_Init.h"
+#include "LCD_Init.h"
+#include "Interrupt_Init.h"
+
+//States
+#define Welcome 0
+#define Gameplay 1
+#define Red 2
+#define Yellow 3
+#define Green 4
+#define Fault 5
+#define Race 6
+#define Stats 7
+#define Restart 8
+
+uint8_t state = 0;
+uint8_t RaceNum = 1;
+float RaceTimes[3] = {0};
+char Buffer[20] = {0};
+float BestTime = 0;
+
+void main(void) {
+    
+    GPIO_Init();
+    Timer0_Init();
+    PWM_Init();
+    TMR1_Init();
+    LCD_Init();
+    Interrupt_Init();
+    
+    while(1){
+        switch(state){
+            case Welcome:
+                commandWrite(0x84);
+                sprintf(Buffer, "RAMP RACEWAY");
+                Display(Buffer);
+                
+                commandWrite(0x98);
+                sprintf(Buffer, "VAUGHN  LUCE");
+                Display(Buffer);
+                
+                commandWrite(0xDB);
+                sprintf(Buffer, "EGR227");
+                Display(Buffer);
+                
+                Timer_Delay(1);
+                
+                if(Debounce(Button_Flag)){
+                    state = Gameplay;
+                    Button_Flag = 0;
+                    commandWrite(0x01);
+                }
+                else{
+                    state = Welcome;
+                }
+                break;
+            case Gameplay: 
+                LATE &= ~0x07;
+                PIR8 &= ~0x40;
+                ServoAngle(state);
+                
+                commandWrite(0x80);
+                sprintf(Buffer, "Race#:%d", RaceNum);
+                Display(Buffer);
+                
+                commandWrite(0x94);
+                sprintf(Buffer, "Press Button to");
+                Display(Buffer);
+                
+                commandWrite(0xD4);
+                sprintf(Buffer, "Start Countdown");
+                Display(Buffer);
+                
+                Timer_Delay(1);
+                
+                if(Debounce(Button_Flag)){
+                    state = Red;
+                    Button_Flag = 0;
+                    commandWrite(0x01);
+                }
+                else{
+                    state = Gameplay;
+                }
+                break;
+            case Red:
+                LATE |= 0x01; //Red LED
+                BuzzerPitch(state);
+                Timer_Delay(500);
+                                                
+                if(Debounce(Button_Flag)){
+                    state = Fault;
+                    Button_Flag = 0;
+                    
+                    Timer_Delay(10000);
+                    BuzzerPitch(state);
+                    Timer_Delay(10000);
+                    BuzzerPitch(state);
+                    
+                    commandWrite(0x01);
+                    Timer_Delay(10000);
+                    commandWrite(0x87);
+                    sprintf(Buffer, "FAULT!");
+                    Display(Buffer);
+                
+                    Timer_Delay(1);
+                
+                    RaceTimes[RaceNum] = 8;
+                    RaceNum++;
+                    commandWrite(0x01);
+                }
+                else{
+                    state = Yellow;
+                }
+                
+                break;
+            case Yellow:
+                LATE &= ~0x01;
+                LATE |= 0x02;
+                                
+                BuzzerPitch(state);
+                Timer_Delay(500);
+                
+                if(Debounce(Button_Flag)){
+                    state = Fault;
+                    Button_Flag = 0;
+                    
+                    Timer_Delay(10000);
+                    BuzzerPitch(state);
+                    Timer_Delay(10000);
+                    BuzzerPitch(state);
+                    
+                    commandWrite(0x01);
+                    Timer_Delay(10000);
+                    commandWrite(0x87);
+                    sprintf(Buffer, "FAULT!");
+                    Display(Buffer);
+                
+                    Timer_Delay(1);
+                
+                    RaceTimes[RaceNum] = 20;
+                    RaceNum++;
+                    commandWrite(0x01);
+                }
+                else{
+                    state = Green;
+                    T1RO = 0;
+                    
+                    LATE &= ~0x02;
+                    LATE |= 0x04;
+                                        
+                    TMR3 = 0;
+                    T3CON |= 0x01;
+                    
+                    BuzzerPitch(state);
+                    Timer_Delay(500);
+                }
+                break;
+            case Green:
+                if(Debounce(Button_Flag)){
+                    state = Race;
+                    Button_Flag = 0;
+
+                    PIE1 &= ~0x01; //   disable button interrupt
+                    
+                    ServoAngle(6); //   set servo angle
+                    
+                    PIR8 &= ~0x40;
+                    IR_Flag = 0;
+                    PIE8 |= 0x40;
+                }
+                else state = Green;
+                break;
+            case Fault:
+                    commandWrite(0x80);
+                    sprintf(Buffer, "Race#:%d", RaceNum - 1);
+                    Display(Buffer);
+                
+                    commandWrite(0x94);
+                    sprintf(Buffer, "RACE TIME: FAULT");
+                    Display(Buffer);
+                    
+                    commandWrite(0xD4);
+                    if(BestTime != 0){
+                        sprintf(Buffer, "BEST TIME %0.2fS", BestTime);
+                    }
+                    else if(BestTime == 0){
+                        sprintf(Buffer, "BEST TIME: FAULT");
+                    }
+                    Display(Buffer);
+                
+                if((RaceNum >= 4) && Debounce(Button_Flag)){
+                    state = Restart;
+                    Button_Flag = 0;
+                    commandWrite(0x01);
+                }
+                else if((RaceNum < 4) && Debounce(Button_Flag)){
+                    state = Gameplay;
+                    Button_Flag = 0;
+                    commandWrite(0x01);
+                }                
+                break;
+            case Race:
+                if (IR_Flag){
+                    LATE |= 0x07;
+                    
+                    state = Stats;
+                    IR_Flag = 0;
+                    PIE8 &= ~0x40;
+                    
+                    BuzzerPitch(state);
+                    
+                    Time = 0;
+                    RaceTimeCalc();
+                    RaceTimes[RaceNum - 1] = Time;
+                    T3CON &= ~0x01; //Turns off timer
+                    PIE1 |= 0x01; //Activate Button Interrupt
+
+                    commandWrite(0x80);
+                    sprintf(Buffer, "Race#:%d", RaceNum);
+                    Display(Buffer);
+                    
+                    if(BestTime == 0){
+                        BestTime = RaceTimes[RaceNum - 1];
+                    }
+                    if(RaceTimes[RaceNum-1] < BestTime){
+                        BestTime = RaceTimes[RaceNum - 1];
+                    }
+                    
+                    commandWrite(0x94);
+                    sprintf(Buffer, "RACE TIME %0.2fS", RaceTimes[RaceNum - 1]);
+                    Display(Buffer);
+                    
+                    commandWrite(0xD4);
+                    sprintf(Buffer, "BEST TIME %0.2fS", BestTime);
+                    Display(Buffer);
+                }
+                else{
+                    state = Race;
+                }
+                break;
+            case Stats:
+                if(Debounce(Button_Flag)){
+                    ServoAngle(state);
+                    Button_Flag = 0;
+                    RaceNum++;
+                    if(RaceNum >= 4){
+                        commandWrite(0x01);
+                        state = Restart;
+                    }
+                    else if (RaceNum < 4){
+                        commandWrite(0x01);
+                        state = Gameplay;
+                    }
+                }
+                else{
+                    state = Stats;
+                }
+                break;
+            case Restart:
+                RaceNum = 1;
+                BestTime = 0;
+                LATE &= ~0x07;
+                state = Gameplay;;
+                break;
+            default: state = 0;
+        }
+    }
+    
+    return;
+}
+
