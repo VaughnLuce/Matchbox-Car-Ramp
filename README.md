@@ -16,4 +16,4 @@ The first step in this project was to make a state diagram. There are only 2 inp
 - State 7 (Display Stats): Once the infrared sensor is blocked, the time elapsed since the light turns green is shown on the LCD screen along with the race number and best race time.
 - State 8 (Restart): Once the third and final race is finished, the race number resets and the user is prompted if they want to start a new race.
 
-![Diagram](images/StateDiagram.jpg)
+![Diagram](images/StateDiagram.png)
