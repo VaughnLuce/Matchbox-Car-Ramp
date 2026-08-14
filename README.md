@@ -7,9 +7,9 @@ The first step in this project was to make a state diagram. There are only 2 inp
 - State 0 (Welcome Screen): Displays “Ramp Raceway” and the students name and class number.
 - State 1 (Gameplay Screen): Displays the race number out of three and “Click Button to Start Race”.
 - State 2 (Red LED): Lights up red LED and turns on a buzzer for a half second.
-State 3 (Yellow LED): Turns off red LED, turns on yellow LED, and turns on a buzzer for a half second.
-State 4 (Green LED): Turns off yellow LED, turns on green LED, turns on a buzzer for a half second, and waits for button press to start the race.
-State 5 (Fault): This state is only entered if the user presses the push button before the light turns green and the buzzer will turn on briefly to signify a fault.
-State 6 (Race): The servo gate opens and the car starts rolling down the ramp and the next state will not be entered until the infrared sensor is blocked.  The servo is also reset.
-State 7 (Display Stats): Once the infrared sensor is blocked, the time elapsed since the light turns green is shown on the LCD screen along with the race number and best race time.
-State 8 (Restart): Once the third and final race is finished, the race number resets and the user is prompted if they want to start a new race.
+- State 3 (Yellow LED): Turns off red LED, turns on yellow LED, and turns on a buzzer for a half second.
+- State 4 (Green LED): Turns off yellow LED, turns on green LED, turns on a buzzer for a half second, and waits for button press to start the race.
+- State 5 (Fault): This state is only entered if the user presses the push button before the light turns green and the buzzer will turn on briefly to signify a fault.
+- State 6 (Race): The servo gate opens and the car starts rolling down the ramp and the next state will not be entered until the infrared sensor is blocked.  The servo is also reset.
+- State 7 (Display Stats): Once the infrared sensor is blocked, the time elapsed since the light turns green is shown on the LCD screen along with the race number and best race time.
+- State 8 (Restart): Once the third and final race is finished, the race number resets and the user is prompted if they want to start a new race.
