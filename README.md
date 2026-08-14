@@ -22,4 +22,4 @@ The first step in this project was to make a state diagram. There are only 2 inp
 ![Schem](images/Schematic.png)
 
 # PIC18F Microcontroller
-![Micro](images/PIC18F pinout.png)
+![Micro](images/PIC18F.png)
